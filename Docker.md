@@ -2,7 +2,7 @@
 ## Docker能做什么
 >之前的虚拟机技术
 
-![](D:\code\workspace\imageDepository\docker\容器技术.png)
+![](image/docker/虚拟机技术.png)
 
 
 虚拟机技术的缺点：
@@ -15,7 +15,7 @@
 
 ==容器化技术不是模拟的一个完整的操作系统==
 
-![](D:\code\workspace\imageDepository\docker\虚拟机技术.png)
+![](image/docker/容器技术.png)
 
 比较Docker和虚拟机技术的不同：
 
@@ -49,7 +49,7 @@ Docker是内核级别的虚拟化，可以在一个物理机上运行很多的�
 
 ## Docker的基本组成
 
-![image-20200812111026247](D:\code\workspace\imageDepository\docker\docker架构图.png)
+![](image/docker/docker架构图.png)
 
 **镜像（image）：**
 
@@ -211,7 +211,7 @@ rm -rf /var/lib/docker
 
 ## 回顾HelloWorld流程
 
-![image-20200812183522469](D:\code\workspace\imageDepository\docker\docker-run流程.png)
+![](image/docker/docker-run流程.png)
 
 ## 底层原理
 
@@ -221,7 +221,7 @@ Docker是一个Client-Server结构的系统，Docker的守护进程运行在宿�
 
 DockerServer接收到DockerClient的指令，就会执行这个指令！
 
-![image-20200813110311654](D:\code\workspace\imageDepository\docker\docker底层原理.png)
+![](image/docker/docker底层原理.png)
 
 **Docker为什么比VM快**
 
@@ -718,7 +718,7 @@ document  dump.rdb  environment  soft  test.java
 
 ## 小结
 
-![img](D:\code\workspace\imageDepository\docker\docker命令.png)
+![](image/docker/docker命令.png)
 
 ```shell
 Commands:
@@ -799,7 +799,7 @@ conf.d	fastcgi_params	koi-utf  koi-win  mime.types  modules  nginx.conf  scgi_pa
 
 端口暴露的概念
 
-![image-20200813173241644](D:\code\workspace\imageDepository\docker\端口暴露的概念.png)
+![](image/docker/端口暴露的概念.png)
 
 > Docker安装Tomcat
 
@@ -861,7 +861,7 @@ docker run -d --name elasticsearch  -p 9200:9200 -p 9300:9300 -e "discovery.type
 
 使用kibana连接es，网络如何能够连接过去
 
-![image-20200813182951432](D:\code\workspace\imageDepository\docker\kinaba连接ES.png)
+![](image/docker/kinaba连接ES.png)
 
 ## 可视化
 
@@ -905,7 +905,7 @@ bootfs（boot file system）主要包含bootloader和kernel，BootLoader主要�
 
 rootfs（root file system），在bootfs之上，包含的就是典型Linux系统中的/dev , /proc ,/bin,/etc 等标准目录和文件，rootfs就是各种不通的操作系统发行版，比如Ubuntu，Centos等
 
-![img](D:\code\workspace\imageDepository\docker\docker加载镜像.png)
+![](image/docker/docker加载镜像.png)
 
 对于一个精简的OS，rootfs可以很小，只需要包含最基本的命令，工具和程序库就可以了，因为等直接用Host的kernel，自己只需要提供rootfs就可以了。由此可见对于不同的Linux发行版，bootfs基本是一直的，rootfs会有差别，因此不同的发行版可以共用bootfs。
 
@@ -927,7 +927,7 @@ rootfs（root file system），在bootfs之上，包含的就是典型Linux系�
 
 该镜像当前已经包含3个镜像层，如下图所示
 
-![image-20200813211635914](D:\code\workspace\imageDepository\docker\docker镜像分层.png)
+![](image/docker/docker镜像分层.png)
 
 在添加额外的镜像层的同事，镜像始终保持是当前所有镜像的组合，理解这一点非常重要。下图中举了一个简单的例子，每个镜像层包含了三个文件，而镜像包含了来自两个镜像层的六个文件
 
@@ -1034,9 +1034,436 @@ local               1256b49dc56b8d47a52e845a0bd05168c431730ed487de1d2654d2f204f7
 # 这种就是匿名挂载，在-v的时候 只写了容器内的路径，没有写容器外的路径
 
 # 具名挂载 通过 -v 卷名:容器内路径
-docker run -d -P --name nginx01 -v juming-nginx:/etc/nginx nginx
+[root@iZm5e74mdg5903trjt1e17Z home]# docker run -d -P --name nginx01 -v juming-nginx:/etc/nginx nginx
 
-docker volume inspect juming-nginx
+[root@iZm5e74mdg5903trjt1e17Z home]# docker volume ls
+DRIVER              VOLUME NAME
+local               1256b49dc56b8d47a52e845a0bd05168c431730ed487de1d2654d2f204f74a9f
+local               juming-nginx
+[root@iZm5e74mdg5903trjt1e17Z home]# docker volume inspect juming-nginx
+[
+    {
+        "CreatedAt": "2020-08-15T09:06:38+08:00",
+        "Driver": "local",
+        "Labels": null,
+        "Mountpoint": "/var/lib/docker/volumes/juming-nginx/_data",
+        "Name": "juming-nginx",
+        "Options": null,
+        "Scope": "local"
+    }
+]
+
+
+# 所有docker容器的卷，没有指定目录的情况下都是在/var/lib/docker/volumes/目录下
+# 我们通过具名挂在可以方便的找到我们的一个卷，大多数情况在使用的是 具名挂载
+
+# 如何确地是具名挂载还是匿名挂载，还是指定路径挂载
+-v 容器内路径			#匿名挂载
+-v 卷名：容器内路径		  #具名挂载
+-v /宿主机路径:容器内路径	 #指定路径挂载
+```
+
+# DockerFile
+
+扩展
+
+```shell
+# 通过 -v 容器内路径 ，ro rw 改变读写权限
+ro	readonly	# 只读
+rw	readwrite	# 可读可写
+
+# 一旦这个设置了容器权限，容器对我们挂载出来的内容就限定了
+docker run -d -P --name nginx01 -v juming-nginx:/etc/nginx:ro nginx
+docker run -d -P --name nginx01 -v juming-nginx:/etc/nginx:rw nginx
+
+# ro 只要看到ro就说明这个路径只能通过宿主机来操作，容器内部是无法操作的
+```
+
+## 初识Dockerfile
+
+> **方式二：**
+
+Dockerfile是用来构建docker镜像的构建文件！
+
+通过这个脚本可以生成镜像，镜像是一层一层的，脚本一个个的命令，每个命令都是一层
+
+```shell
+# 创建一个dockerfile文件  名字可以随机，建议使用Dockerfile
+# 文件中的内容 指定（大写） 参数
+[root@iZm5e74mdg5903trjt1e17Z docker-test-volume]# cat Dockerfile 
+FROM centos
+
+VOLUME ["volume01","volume02"]   # 匿名挂载
+
+CMD echo "------end------"
+
+CMD /bin/bash
+
+# 执行docker build 构建镜像
+[root@iZm5e74mdg5903trjt1e17Z docker-test-volume]# docker build -f /home/docker-test-volume/Dockerfile -t zhang/centos:01 .
+Sending build context to Docker daemon  2.048kB
+Step 1/4 : FROM centos
+ ---> 0d120b6ccaa8
+Step 2/4 : VOLUME ["volume01","volume02"]
+ ---> Running in 80028daf02b7
+Removing intermediate container 80028daf02b7
+ ---> 128ffb44288c
+Step 3/4 : CMD echo "------end------"
+ ---> Running in 64819907007b
+Removing intermediate container 64819907007b
+ ---> 13ba23424236
+Step 4/4 : CMD /bin/bash
+ ---> Running in b0b6f84c5390
+Removing intermediate container b0b6f84c5390
+ ---> b86c76e15783
+Successfully built b86c76e15783
+Successfully tagged zhang/centos:01
+
+
+# 运行创建的镜像
+[root@iZm5e74mdg5903trjt1e17Z docker-test-volume]# docker run -it b86c76e15783
+[root@68ef1c6f4c2a /]# ls -l
+total 56
+drwxrwxrwt  7 root root 4096 Aug  9 21:40 tmp
+drwxr-xr-x 12 root root 4096 Aug  9 21:40 usr
+drwxr-xr-x 20 root root 4096 Aug  9 21:40 var
+drwxr-xr-x  2 root root 4096 Aug 15 01:44 volume01	#挂载的卷
+drwxr-xr-x  2 root root 4096 Aug 15 01:44 volume02	#挂载的卷
+
+# 在volume01的目录下随便创建一个文件
+# 退出容器
+# docker inspect 容器id  查看刚才的容器的详细信息，找到挂载卷的主机文件路径
+[root@iZm5e74mdg5903trjt1e17Z docker-test-volume]# docker inspect 68ef1c6f4c2a
+"Mounts": [
+            {
+                "Type": "volume",
+                "Name": "dca8f681198e35a5ee4eab5023aa8e2a0c614fe3d68a2124b647b10bcee89dc3",
+                "Source": "/var/lib/docker/volumes/dca8f681198e35a5ee4eab5023aa8e2a0c614fe3d68a2124b647b10bcee89dc3/_data",
+                "Destination": "volume02",
+                "Driver": "local",
+                "Mode": "",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "volume",
+                "Name": "1c6d384a13455b7b9b9d30ec993912b7bd7d22131adc7778a4e4aec610f899af",
+                "Source": "/var/lib/docker/volumes/1c6d384a13455b7b9b9d30ec993912b7bd7d22131adc7778a4e4aec610f899af/_data",
+                "Destination": "volume01",
+                "Driver": "local",
+                "Mode": "",
+                "RW": true,
+                "Propagation": ""
+            }
+        ],
+# 进入volume01 的路径查看是否有容器新增的文件
+
+# 假设构建镜像的时候没有挂载卷，要手动镜像挂载  -v 卷名：容器内路径
+```
+
+## 数据卷容器
+
+```shell
+# 启动三个容器 
+
+[root@iZm5e74mdg5903trjt1e17Z /]# docker images
+REPOSITORY            TAG                 IMAGE ID            CREATED             SIZE
+zhang/centos          01                  b86c76e15783        4 hours ago         215MB
+centos                latest              0d120b6ccaa8        4 days ago          215MB
+nginx                 latest              08393e824c32        10 days ago         132MB
+mysql                 5.7                 718a6da099d8        10 days ago         448MB
+portainer/portainer   latest              62771b0b9b09        3 weeks ago         79.1MB
+# 启动第一个容器
+[root@iZm5e74mdg5903trjt1e17Z /]# docker run -it --name docker01 b86c76e15783
+
+# 启动第二个容器
+# --volumes-from docker01   挂载继承 docker01   
+# docker01 中的volume01 和volume02的文件夹做了更改，docker02中相同的文件夹的数据就会更改
+[root@iZm5e74mdg5903trjt1e17Z /]# docker run -it --name docker02 --volumes-from docker01 b86c76e15783
+
+#当docker01 容器彻底删除之后   docker02中的数据仍然存在
+```
+
+> 多个mysql之间实现数据共享
+
+```shell
+# 第一个mysql
+docker run -d -p 3306:3306 -v /etc/mysql/conf.d -v /var/lib/mysql -e MYSQL_ROOT_PASSWORD=root --name mysql01 mysql:5.7
+
+# 第二个mysql 继承第一个mysql的挂载
+docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root --name mysql02 --volumes-from mysql01 mysql:5.7
+```
+
+结论：
+
+容器之间配置信息的传递，数据卷容器的生命周期一直持续到没有容器使用为止
+
+如果数据持久化到了本地，这个时候，本地的数据就不会被删除
+
+# DockerFile
+
+dockerfile是用来构建docker镜像的文件，命令参数脚本
+
+构建步骤：
+
+1. 编写一个dockerfile文件
+2. docker build构建成为一个镜像
+3. docker run运行镜像
+4. docker push发布镜像（Docker Hub，阿里云镜像仓库）
+
+```shell
+# centos 7 的dockerfile文件
+FROM scratch
+ADD centos-7-x86_64-docker.tar.xz /
+
+LABEL \
+    org.label-schema.schema-version="1.0" \
+    org.label-schema.name="CentOS Base Image" \
+    org.label-schema.vendor="CentOS" \
+    org.label-schema.license="GPLv2" \
+    org.label-schema.build-date="20200809" \
+    org.opencontainers.image.title="CentOS Base Image" \
+    org.opencontainers.image.vendor="CentOS" \
+    org.opencontainers.image.licenses="GPL-2.0-only" \
+    org.opencontainers.image.created="2020-08-09 00:00:00+01:00"
+
+CMD ["/bin/bash"]
+
+# 很多官方的镜像都是基础包，很多的功能都没有，就需要自己搭建自己需要的镜像
+```
+
+## dockerfile的构建过程
+
+DockerFile：构建文件，定义一切的步骤，源代码
+
+DockerImages：通过DockerFile构建生成的镜像，最终发布和运行的产品
+
+Docker容器：容器就是镜像运行起来提供服务器
+
+## DockerFile的指令
+
+![img](image/docker/dockerfile命令.png)
+
+```shell
+FROM			# 基础镜像，一切从这里开始构建
+MAINTAINER		# 镜像是谁写的，姓名+邮箱
+RUN				# 镜像构建的时候需要运行的命令
+ADD				# 编译镜像的时候，复制文件到镜像中
+WORKDIR			# 镜像的工作目录
+VOLUME			# 设置容器的挂载卷
+EXPOESE			# 设置镜像暴露的端口
+CMD				# 设置容器的启动命令，只有最后一个会生效，可被替代
+ENTRYPOINT		# 设置容器的入口程序。可以追加命令
+ONBUILD			# 当构建一个被继承Dockerfile 这个时候就会运行ONBUILD的指令。触发指令
+COPY			# 编译镜像时复制文件到镜像中，类似ADD
+ENV				# 构建的时候设置环境变量
+```
+
+## 实战测试
+
+Docker Hub中99%的镜像都是从FROM scratch 开始的。
+
+> 创建一个自己的centos
+
+```shell
+# 1. 编写dockerfile文件
+[root@iZm5e74mdg5903trjt1e17Z dockerfile]# cat mydockerfile-centos 
+FROM centos
+
+MAINTAINER Lijiat<zjl509606@163.com>
+
+ENV MYPATH /usr/local
+WORKDIR	$MYPATH
+
+RUN yum -y install vim
+RUN yum -y install net-tools
+
+EXPOSE 80
+
+
+CMD echo $MYPATH
+CMD echo "-----end-----"
+CMD /bin/bash
+
+
+# 2.根据dockerfile构建镜像
+[root@iZm5e74mdg5903trjt1e17Z dockerfile]# docker build -f mydockerfile-centos -t mycentos:0.1 .
+Successfully built 6553d6634583
+Successfully tagged mycentos:0.1
+
+# 3. 测试运行镜像
+[root@iZm5e74mdg5903trjt1e17Z dockerfile]# docker run -it 6553d6634583
+
+# 通过docker history 查看镜像是怎么构建的
+[root@iZm5e74mdg5903trjt1e17Z dockerfile]# docker history 6553d6634583
+IMAGE               CREATED             CREATED BY                                      SIZE                COMMENT
+6553d6634583        5 minutes ago       /bin/sh -c #(nop)  CMD ["/bin/sh" "-c" "/bin…   0B                  
+e9131c47f0fe        5 minutes ago       /bin/sh -c #(nop)  CMD ["/bin/sh" "-c" "echo…   0B                  
+6d16b14aee86        5 minutes ago       /bin/sh -c #(nop)  CMD ["/bin/sh" "-c" "echo…   0B                  
+5e16af0cc6c6        5 minutes ago       /bin/sh -c #(nop)  EXPOSE 80                    0B                  
+9b5d1fbba7c5        5 minutes ago       /bin/sh -c yum -y install net-tools             22.8MB              
+ab88913287fc        5 minutes ago       /bin/sh -c yum -y install vim                   57.2MB              
+5889b2277f82        5 minutes ago       /bin/sh -c #(nop) WORKDIR /usr/local            0B                  
+f2f6ab33dd8d        5 minutes ago       /bin/sh -c #(nop)  ENV MYPATH=/usr/local        0B                  
+e697026cdb8b        5 minutes ago       /bin/sh -c #(nop)  MAINTAINER Lijiat<zjl5096…   0B                  
+0d120b6ccaa8        5 days ago          /bin/sh -c #(nop)  CMD ["/bin/bash"]            0B                  
+<missing>           5 days ago          /bin/sh -c #(nop)  LABEL org.label-schema.sc…   0B                  
+<missing>           5 days ago          /bin/sh -c #(nop) ADD file:538afc0c5c964ce0d…   215MB
+```
+
+> CMD和ENTRYPOINT的区别
+
+```shell
+CMD				# 设置容器的启动命令，只有最后一个会生效，可被替代
+ENTRYPOINT		# 设置容器的入口程序。可以追加命令
+```
+
+测试cmd
+
+```shell
+# 编写dockerfile文件
+[root@iZm5e74mdg5903trjt1e17Z dockerfile]# vim dockerfile-cmd-test
+FROM centos
+
+CMD ["ls","-a"]
+# 构建镜像
+[root@iZm5e74mdg5903trjt1e17Z dockerfile]# docker build -f dockerfile-cmd-test -t cmdtest .
+
+# run 运行 会发现 ls -a命令运行了
+
+[root@iZm5e74mdg5903trjt1e17Z dockerfile]# docker run cmdtest
+.
+..
+.dockerenv
+bin
+dev
+etc
+home
+lib
+lib64
+lost+found
+media
+mnt
+
+# 如果再追加一个不存在标准的命令时 就会报错
+[root@iZm5e74mdg5903trjt1e17Z dockerfile]# docker run cmdtest -l
+docker: Error response from daemon: OCI runtime create failed: container_linux.go:349: starting container process caused "exec: \"-l\": executable file not found in $PATH": unknown.
+# 增加正常的命令就会执行 ls -al  而不会执行dockerfile中的 ls -a
+[root@iZm5e74mdg5903trjt1e17Z dockerfile]# docker run cmdtest ls -al
+total 56
+drwxr-xr-x  1 root root 4096 Aug 16 14:47 .
+drwxr-xr-x  1 root root 4096 Aug 16 14:47 ..
+-rwxr-xr-x  1 root root    0 Aug 16 14:47 .dockerenv
+lrwxrwxrwx  1 root root    7 May 11  2019 bin -> usr/bin
+drwxr-xr-x  5 root root  340 Aug 16 14:47 dev
+drwxr-xr-x  1 root root 4096 Aug 16 14:47 etc
+drwxr-xr-x  2 root root 4096 May 11  2019 home
+lrwxrwxrwx  1 root root    7 May 11  2019 lib -> usr/lib
+lrwxrwxrwx  1 root root    9 May 11  2019 lib64 -> usr/lib64
+drwx------  2 root root 4096 Aug  9 21:40 lost+found
+drwxr-xr-x  2 root root 4096 May 11  2019 media
+drwxr-xr-x  2 root root 4096 May 11  2019 mnt
+```
+
+测试ENTRYPOINT
+
+```shell
+# 编写dockerfile文件
+[root@iZm5e74mdg5903trjt1e17Z dockerfile]# vim dockerfile-entrypoint-test
+FROM centos
+
+ENTRYPOINT ["ls","-a"]
+# entrypoint 在执行run镜像的时候  增加 -l命令  就会追加到dockerfile的 ls -a 的后面 而不是替换
+[root@iZm5e74mdg5903trjt1e17Z dockerfile]# docker run entrypoint-test -l
+```
+
+## 实战tomcat镜像
+
+1. 准备镜像文件tomcat压缩包 ，jdk压缩包
+
+```shell
+[root@iZm5e74mdg5903trjt1e17Z tomcat]# ll
+total 150728
+-rw-r--r-- 1 root root  11211292 Aug 16 22:55 apache-tomcat-9.0.37.tar.gz
+-rw-r--r-- 1 root root       634 Aug 17 14:45 Dockerfile
+-rw-r--r-- 1 root root 143111803 Aug 16 23:10 jdk-8u261-linux-x64.tar.gz
+-rw-r--r-- 1 root root        16 Aug 17 14:08 readme.txt
+```
+
+2. 编写dockerfile文档  官方命名为Dockerfile
+
+```shell
+[root@iZm5e74mdg5903trjt1e17Z tomcat]# cat Dockerfile 
+FROM centos
+MAINTAINER zhang<zjl509606@163.com>
+
+COPY readme.txt /usr/local/readme.txt
+
+
+ADD apache-tomcat-9.0.37.tar.gz /usr/local/
+ADD jdk-8u261-linux-x64.tar.gz /usr/local/
+
+RUN yum -y install vim
+
+ENV MYPATH /usr/local
+WORKDIR $MYPATH
+
+ENV JAVA_HOME /usr/local/jdk1.8.0_261
+ENV CLASSPATH $JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+ENV CATALINA_HOME /usr/local/apache-tomcat-9.0.37
+ENV CATALINA_BASH /usr/local/apache-tomcat-9.0.37
+ENV PATH $PATH:$JAVA_HOME/bin:$CATALINA_HOME/lib:$CATALINA_HOME/bin
+
+EXPOSE 8080
+
+CMD /usr/local/apache-tomcat-9.0.37/bin/startup.sh && tail -f /usr/local/apache-tomcat-9.0.37/logs/catalina.out
+```
+
+3. 构建镜像
+
+```shell
+[root@iZm5e74mdg5903trjt1e17Z tomcat]# docker buid -t divtomcat .
+```
+
+4. 启动镜像
+
+```shell
+[root@iZm5e74mdg5903trjt1e17Z tomcat]# docker run -d -p 8060:8080 --name lijiattomcat -v /home/zhang/build/tomcat/test:/usr/local/apache-tomcat-9.0.37/webapps/test/ -v /home/zhang/build/tomcat/tomcatlogs/:/usr/local/apache-tomcat-9.0.37/logs/ divtomcat
+```
+
+5. 访问测试
+6. 发布项目（由于做了卷挂载，可以直接在本机的目录文件修改项目了）
+
+```xml
+<web-app xmlns="http://java.sun.com/xml/ns/javaee"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://java.sun.com/xml/ns/javaee
+                               http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
+           version="2.5">
+
+</web-app>
+```
+
+```jsp
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>zhang</title>
+</head>
+<body>
+Hello World!<br/>
+The time on the server is <%= new java.util.Date() %>
+<%
+out.println("你的 IP 地址 " + request.getRemoteAddr());
+%>
+<%
+System.out.println("访问： " + request.getRemoteAddr());
+%>
+</body>
+</html>
 ```
 
 
@@ -1044,12 +1471,6 @@ docker volume inspect juming-nginx
 
 
 
-
-
-
-
-
-# DockerFile
 
 
 
