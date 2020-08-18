@@ -1466,13 +1466,712 @@ System.out.println("访问： " + request.getRemoteAddr());
 </html>
 ```
 
+## 发布镜像
+
+> 发布到docker hub
+
+```shell
+# 1. 先登录docker hub    通过 docker login
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker login -u lijiat
+Password: 
+WARNING! Your password will be stored unencrypted in /root/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+
+Login Succeeded
+
+# 2. 提交镜像  通过 docker push
+# lijiat 为登录的账户名   还需要加上版本号
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker push lijiat/divtomcat:1.0
+
+# 如果没有版本号   就为镜像增加tag
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker tag 5b73a42ad0a2 lijiat/tomcat:1.0
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker push lijiat/tomcat:1.0
+The push refers to repository [docker.io/lijiat/tomcat]
+```
 
 
 
+> 发布到阿里云镜像服务上
 
+1. 登录阿里云
+2. 找到容器镜像服务
+3. 创建命名空间
 
+![image-20200818110808491](image/docker/创建命名空间.png)
+
+4. 创建镜像仓库
+
+![image-20200818111336319](image/docker/创建镜像仓库.png)
+
+5. 查看镜像仓库推送的步骤
+
+```shell
+# 1. 登录阿里云Docker Registry
+$ sudo docker login --username=lijiat_01 registry.cn-qingdao.aliyuncs.com
+# 用于登录的用户名为阿里云账号全名，密码为开通服务时设置的密码。
+
+# 您可以在访问凭证页面修改凭证密码。
+
+# 2. 从Registry中拉取镜像
+$ sudo docker pull registry.cn-qingdao.aliyuncs.com/lijiat-docker/lijiat-tets:[镜像版本号]
+# 3. 将镜像推送到Registry
+$ sudo docker login --username=lijiat_01 registry.cn-qingdao.aliyuncs.com
+$ sudo docker tag [ImageId] registry.cn-qingdao.aliyuncs.com/lijiat-docker/lijiat-tets:[镜像版本号]
+$ sudo docker push registry.cn-qingdao.aliyuncs.com/lijiat-docker/lijiat-tets:[镜像版本号]
+# 请根据实际镜像信息替换示例中的[ImageId]和[镜像版本号]参数。
+
+# 4. 选择合适的镜像仓库地址
+# 从ECS推送镜像时，可以选择使用镜像仓库内网地址。推送速度将得到提升并且将不会损耗您的公网流量。
+
+# 如果您使用的机器位于VPC网络，请使用 registry-vpc.cn-qingdao.aliyuncs.com 作为Registry的域名登录，并作为镜像命名空间前缀。
+# 5. 示例
+# 使用"docker tag"命令重命名镜像，并将它通过专有网络地址推送至Registry。
+
+$ sudo docker images
+REPOSITORY                                                         TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+registry.aliyuncs.com/acs/agent                                    0.7-dfb6816         37bb9c63c8b2        7 days ago          37.89 MB
+$ sudo docker tag 37bb9c63c8b2 registry-vpc.cn-qingdao.aliyuncs.com/acs/agent:0.7-dfb6816
+# 使用"docker images"命令找到镜像，将该镜像名称中的域名部分变更为Registry专有网络地址。
+
+$ sudo docker push registry-vpc.cn-qingdao.aliyuncs.com/acs/agent:0.7-dfb6816
+```
 
 
 
 # Docker 网络
 
+### 理解网络
+
+> 测试
+
+![image-20200818114828763](image/docker/ipaddr.png)
+
+```shell
+# 问题 docker 是如何处理容器网络访问的？
+```
+
+![image-20200818115315737](image/docker/docker访问网络问题.png)
+
+```shell
+# 运行一个Tomcat容器
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker run -d -P --name tomcat01 tomcat
+
+# 查看容器的内部网络地址 ip addr   容器启动的时候会得到一个 eth0@if116 ip地址 docker分配的
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker exec -it tomcat01 ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+115: eth0@if116: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:ac:11:00:02 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 172.17.0.2/16 brd 172.17.255.255 scope global eth0
+       valid_lft forever preferred_lft forever
+
+# 思考 Linux能不能ping通  容器内部
+[root@iZm5e74mdg5903trjt1e17Z ~]# ping 172.17.0.2
+PING 172.17.0.2 (172.17.0.2) 56(84) bytes of data.
+64 bytes from 172.17.0.2: icmp_seq=1 ttl=64 time=0.095 ms
+64 bytes from 172.17.0.2: icmp_seq=2 ttl=64 time=0.076 ms
+64 bytes from 172.17.0.2: icmp_seq=3 ttl=64 time=0.072 ms
+
+```
+
+> 原理
+
+1. 我们每启动一个docker容器，docker就会给docker容器分配一个ip，我们只要安装docker，就会有一个网卡docker0桥接模式，使用的技术是veth-pair技术
+
+再次测试ip addr
+
+![image-20200818140254824](image/docker/ip测试1.png)
+
+2. 再次启动一个容器测试
+
+![image-20200818140344748](image/docker/ip测试2.png)
+
+```shell
+# 发现这个容器的网卡，都是一对一对的
+# evth-pair 就是一对的虚拟设备接口，他们都是成对出现的，一端连着协议，一端彼此相连
+# 正因为有这个特性，veth-pair充当一个桥梁，链接各种虚拟网络设备的
+# OpenStack，Docker容器之间的链接，OVS的连接，都是使用的veth-pair技术
+```
+
+3. 测试一下容器tomcat01 和 tomcat02 之间是否可以ping通
+
+```shell
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker exec -it tomcat01 ping 172.17.0.2
+PING 172.17.0.2 (172.17.0.2) 56(84) bytes of data.
+64 bytes from 172.17.0.2: icmp_seq=1 ttl=64 time=0.056 ms
+64 bytes from 172.17.0.2: icmp_seq=2 ttl=64 time=0.050 ms
+
+# 结论：容器和容器之间是可以ping通的
+```
+
+![image-20200818142518061](image/docker/容器之间的网络连接.png)
+
+结论：tomcat和tomcat02 是共用的一个路由器，docker0
+
+所有的容器不指定网路的情况下，都是docker0路由器，docker会给我们的容器分配一个默认的可用ip
+
+Docker中的所有网络都是虚拟的，虚拟的转发效率高（内网传递文件）
+
+只要容器删除，对应的网桥一对就没有了。
+
+### --link
+
+> 思考一个场景，我们编写一个微服务，database uri：ip，项目不重启，数据库ip换掉了，希望可以解决这个问题，通过名字访问容器
+
+```shell
+# 直接用tomcat01 ping tomcat02是ping不通的
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker exec -it tomcat01 ping tomcat02
+ping: tomcat02: Name or service not known
+
+# 创建tomcat03 --link tomcat01
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker run -d -P --name tomcat03 --link tomcat01 tomcat
+52731cef596c261d47242b29db66c3763375d3efe3e1f6af517e49627a399a5a
+
+# 用tomcat01 ping tomcat03是ping不通的
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker exec -it tomcat01 ping tomcat03
+ping: tomcat03: Name or service not known
+
+# 用tomcat03 ping tomcat01是可以ping通的
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker exec -it tomcat03 ping tomcat01
+PING tomcat01 (172.17.0.2) 56(84) bytes of data.
+64 bytes from tomcat01 (172.17.0.2): icmp_seq=1 ttl=64 time=0.108 ms
+64 bytes from tomcat01 (172.17.0.2): icmp_seq=2 ttl=64 time=0.079 ms
+64 bytes from tomcat01 (172.17.0.2): icmp_seq=3 ttl=64 time=0.073 ms
+64 bytes from tomcat01 (172.17.0.2): icmp_seq=4 ttl=64 time=0.073 ms
+^C
+--- tomcat01 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3ms
+rtt min/avg/max/mdev = 0.073/0.083/0.108/0.015 ms
+
+```
+
+现在玩docker已经不建议使用了
+
+### 探究inspect
+
+```shell
+# docker network ls 可以查看当前网络的情况
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+f00fbf1eb56c        bridge              bridge              local
+ad39af0674ff        host                host                local
+c1459160498e        none                null                local
+0938e02910dd        test-net            bridge              local
+
+# 使用 docker network inspect [NETWORK ID]  可以查看这个网络的详细情况
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker network inspect f00fbf1eb56c
+
+# 使用 docker inspect [容器id] 查看容器的具体情况
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker inspect 52731cef596c
+"HostConfig": {
+            "Binds": null,
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "default",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "no",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "CapAdd": null,
+            "CapDrop": null,
+            "Capabilities": null,
+            "Dns": [],
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": null,
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": [
+                "/tomcat01:/tomcat03/tomcat01"   #tomcat03 配置了 tomcat01的链接
+            ],
+# 查看容器内的 hosts文件也可以看到网络的配置
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker exec -it tomcat03 cat /etc/hosts
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+ff00::0	ip6-mcastprefix
+ff02::1	ip6-allnodes
+ff02::2	ip6-allrouters
+172.17.0.2	tomcat01 5fb904f21e5b  #再次绑定了tomcat01 的网络
+172.17.0.4	52731cef596c
+```
+
+### 自定义网络
+
+> 查看所有的docker网络
+
+```shell
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+f00fbf1eb56c        bridge              bridge              local
+ad39af0674ff        host                host                local
+c1459160498e        none                null                local
+0938e02910dd        test-net            bridge              local
+```
+
+**网络模式：**
+
+bridge：桥接（默认，自己创建也使用的桥接模式）
+
+none：不配置网络
+
+host：和宿主机共享网络
+
+container：容器网络连通（用的少，局限很大）
+
+```shell
+# 在启动项目的时候  会默认设置 --net bridge 默认为docker0的网关
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker run -d -P --name tomcat01 --net bridge tomcat
+
+# 设置自定义网络
+# --driver 网络模式  默认bridge
+# --subnet 设置子网掩码
+# --gateway 设置网关
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker network create --driver bridge --subnet 192.168.0.0/16 --gateway 192.168.0.1 mynet
+381bd57183c3b27edcc19f4d2f5de22da057e82f163137f4f0720081333044af
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+f00fbf1eb56c        bridge              bridge              local
+ad39af0674ff        host                host                local
+381bd57183c3        mynet               bridge              local
+c1459160498e        none                null                local
+0938e02910dd        test-net            bridge              local
+
+
+# 查看自己定义的网络信息
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker network inspect mynet
+[
+    {
+        "Name": "mynet",
+        "Id": "381bd57183c3b27edcc19f4d2f5de22da057e82f163137f4f0720081333044af",
+        "Created": "2020-08-18T15:19:16.568789731+08:00",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": {},
+            "Config": [
+                {
+                    "Subnet": "192.168.0.0/16",
+                    "Gateway": "192.168.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Containers": {},
+        "Options": {},
+        "Labels": {}
+    }
+]
+```
+
+根据自定义的网络启动两个容器
+
+```shell
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker run -d -P --name tomcat-net-01 --net mynet tomcat
+eca6526ea671d540097aa8190efb7af5ce0d1b8071a0fb304f1dd0207b40fc14
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker run -d -P --name tomcat-net-02 --net mynet tomcat
+8402509c32af4b2876315c283ddb9582827d5d6a181d690f3d3b7c492d675b0c
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker network inspect mynet
+[
+    {
+        "Name": "mynet",
+        "Id": "381bd57183c3b27edcc19f4d2f5de22da057e82f163137f4f0720081333044af",
+        "Created": "2020-08-18T15:19:16.568789731+08:00",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": {},
+            "Config": [
+                {
+                    "Subnet": "192.168.0.0/16",
+                    "Gateway": "192.168.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Containers": {
+            "8402509c32af4b2876315c283ddb9582827d5d6a181d690f3d3b7c492d675b0c": {
+                "Name": "tomcat-net-02",
+                "EndpointID": "2dea5c4ac61ad6bb8d96590dc2c7e12d11c3e56fa7bb3017d5d8165845f82e0e",
+                "MacAddress": "02:42:c0:a8:00:03",
+                "IPv4Address": "192.168.0.3/16",
+                "IPv6Address": ""
+            },
+            "eca6526ea671d540097aa8190efb7af5ce0d1b8071a0fb304f1dd0207b40fc14": {
+                "Name": "tomcat-net-01",
+                "EndpointID": "70c0bd53a2a704cb00c3db967d54ca5f7170036fb1c9ddd25281c7ff76d6aa61",
+                "MacAddress": "02:42:c0:a8:00:02",
+                "IPv4Address": "192.168.0.2/16",
+                "IPv6Address": ""
+            }
+        },
+        "Options": {},
+        "Labels": {}
+    }
+]
+
+
+# 使用自定义的网络启动容器之后，就可以直接根据容器名ping数据了
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker exec -it tomcat-net-01 ping tomcat-net-02
+PING tomcat-net-02 (192.168.0.3) 56(84) bytes of data.
+64 bytes from tomcat-net-02.mynet (192.168.0.3): icmp_seq=1 ttl=64 time=0.092 ms
+64 bytes from tomcat-net-02.mynet (192.168.0.3): icmp_seq=2 ttl=64 time=0.083 ms
+^C
+--- tomcat-net-02 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+rtt min/avg/max/mdev = 0.083/0.087/0.092/0.010 ms
+
+```
+
+好处：
+
+redis集群：不同的集群使用不同的网络，保证集群是安全和健康的
+
+mysql集群：不同的集群使用不同的网络，保证集群是安全和健康的
+
+### 网络连通
+
+![image-20200818153751481](image/docker/docker-network.png)
+
+
+
+```shell
+# 启动tomcat01容器和tomcat02容器
+# 测试打通 tomcat01 - mynet
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker network connect mynet tomcat01
+
+# 连通之后  tomcat01就会被分配到mynet的网络之下了
+# 一个容器两个ip
+"Containers": {
+            "032f01ee76b72a379ee96c8e3d034db238f086988c6687c9d9f52ad576e034f0": {
+                "Name": "tomcat01",
+                "EndpointID": "ac4c8395771c038e308c44b4b9de5381647bff299907083bfad6f7494eafd504",
+                "MacAddress": "02:42:c0:a8:00:04",
+                "IPv4Address": "192.168.0.4/16",
+                "IPv6Address": ""
+            },
+            "8402509c32af4b2876315c283ddb9582827d5d6a181d690f3d3b7c492d675b0c": {
+                "Name": "tomcat-net-02",
+                "EndpointID": "2dea5c4ac61ad6bb8d96590dc2c7e12d11c3e56fa7bb3017d5d8165845f82e0e",
+                "MacAddress": "02:42:c0:a8:00:03",
+                "IPv4Address": "192.168.0.3/16",
+                "IPv6Address": ""
+            },
+            "eca6526ea671d540097aa8190efb7af5ce0d1b8071a0fb304f1dd0207b40fc14": {
+                "Name": "tomcat-net-01",
+                "EndpointID": "70c0bd53a2a704cb00c3db967d54ca5f7170036fb1c9ddd25281c7ff76d6aa61",
+                "MacAddress": "02:42:c0:a8:00:02",
+                "IPv4Address": "192.168.0.2/16",
+                "IPv6Address": ""
+            }
+        },
+
+# 这样容器就连通了
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker exec -it tomcat01 ping tomcat-net-01
+PING tomcat-net-01 (192.168.0.2) 56(84) bytes of data.
+64 bytes from tomcat-net-01.mynet (192.168.0.2): icmp_seq=1 ttl=64 time=0.079 ms
+64 bytes from tomcat-net-01.mynet (192.168.0.2): icmp_seq=2 ttl=64 time=0.090 ms
+^C
+--- tomcat-net-01 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+rtt min/avg/max/mdev = 0.079/0.084/0.090/0.010 ms
+
+```
+
+### 实战部署redis集群
+
+![image-20200818154940086](image/docker/redis集群.png)
+
+
+
+
+
+```shell
+# 1.创建一个redis网卡
+[root@iZm5e74mdg5903trjt1e17Z ~]# docker network create redis --subnet 172.38.0.0/16
+9a10f2c6f2493ae61c4806d0ae95cc7cf7790d2eaf764642c61d9ed3e78eab88
+
+# 2. 通过脚本创建六个redis的配置
+for port in $(seq 1 6); \
+do \
+mkdir -p /mydata/redis/node-${port}/conf
+cat << EOF >/mydata/redis/node-${port}/conf/redis.conf
+port 6379
+bind 0.0.0.0
+cluster-enabled yes
+cluster-config-file nodes.conf
+cluster-node-timeout 5000
+cluster-announce-ip 172.38.0.1${port}
+cluster-announce-port 6379
+cluster-announce-bus-port 16379
+appendonly yes
+EOF
+done
+ # for循环启动六个redis容器
+for port in $(seq 1 6); \
+do \
+docker run -p 637${port}:6379 -p 1637${port}:16379 --name redis-${port} \
+-v /mydata/redis/node-${port}/data:/data \
+-v /mydata/redis/node-${port}/conf/redis.conf:/etc/redis/redis.conf \
+-d --net redis --ip 172.38.0.1${port} redis:5.0.9-alpine3.11 redis-server /etc/redis/redis.conf
+done
+
+
+docker run -p 6371:6379 -p 16371:16379 --name redis-1 \
+-v /mydata/redis/node-1/data:/data \
+-v /mydata/redis/node-1/conf/redis.conf:/etc/redis/redis.conf \
+-d --net redis --ip 172.38.0.11 redis:5.0.9-alpine3.11 redis-server /etc/redis/redis.conf
+
+# 进入redis-1的容器内创建集群
+[root@iZm5e74mdg5903trjt1e17Z redis]# docker exec -it redis-1 /bin/sh
+# 创建集群
+/data # redis-cli --cluster create 172.38.0.11:6379 172.38.0.12:6379 172.38.0.13:6379 172.38.0.14:6379 172.38.0.15:6379 172.38.0.16:6379 --cluster-replicas 1
+>>> Performing hash slots allocation on 6 nodes...
+Master[0] -> Slots 0 - 5460
+Master[1] -> Slots 5461 - 10922
+Master[2] -> Slots 10923 - 16383
+Adding replica 172.38.0.15:6379 to 172.38.0.11:6379
+Adding replica 172.38.0.16:6379 to 172.38.0.12:6379
+Adding replica 172.38.0.14:6379 to 172.38.0.13:6379
+M: 7692c06fb762868520fc0dd54766d1bff52cf954 172.38.0.11:6379
+   slots:[0-5460] (5461 slots) master
+M: 0302a02d70f17f14ff376677eca4871ee505bcfb 172.38.0.12:6379
+   slots:[5461-10922] (5462 slots) master
+M: 9c08682de28222c200efbc0cdb55d5b48fb6e907 172.38.0.13:6379
+   slots:[10923-16383] (5461 slots) master
+S: a0013cba4060781319db50f4dbd175990e07fdc3 172.38.0.14:6379
+   replicates 9c08682de28222c200efbc0cdb55d5b48fb6e907
+S: 88bd91cdb7fcd905fb0546399762afd1219cbdd3 172.38.0.15:6379
+   replicates 7692c06fb762868520fc0dd54766d1bff52cf954
+S: c4bb54439afc4e971e255d51248468e8a5bc7bbc 172.38.0.16:6379
+   replicates 0302a02d70f17f14ff376677eca4871ee505bcfb
+Can I set the above configuration? (type 'yes' to accept): yes
+>>> Nodes configuration updated
+>>> Assign a different config epoch to each node
+>>> Sending CLUSTER MEET messages to join the cluster
+Waiting for the cluster to join
+...
+>>> Performing Cluster Check (using node 172.38.0.11:6379)
+M: 7692c06fb762868520fc0dd54766d1bff52cf954 172.38.0.11:6379
+   slots:[0-5460] (5461 slots) master
+   1 additional replica(s)
+M: 0302a02d70f17f14ff376677eca4871ee505bcfb 172.38.0.12:6379
+   slots:[5461-10922] (5462 slots) master
+   1 additional replica(s)
+S: 88bd91cdb7fcd905fb0546399762afd1219cbdd3 172.38.0.15:6379
+   slots: (0 slots) slave
+   replicates 7692c06fb762868520fc0dd54766d1bff52cf954
+S: a0013cba4060781319db50f4dbd175990e07fdc3 172.38.0.14:6379
+   slots: (0 slots) slave
+   replicates 9c08682de28222c200efbc0cdb55d5b48fb6e907
+S: c4bb54439afc4e971e255d51248468e8a5bc7bbc 172.38.0.16:6379
+   slots: (0 slots) slave
+   replicates 0302a02d70f17f14ff376677eca4871ee505bcfb
+M: 9c08682de28222c200efbc0cdb55d5b48fb6e907 172.38.0.13:6379
+   slots:[10923-16383] (5461 slots) master
+   1 additional replica(s)
+[OK] All nodes agree about slots configuration.
+>>> Check for open slots...
+>>> Check slots coverage...
+[OK] All 16384 slots covered.
+
+# 连接集群
+/data # redis-cli -c
+# 查看集群的节点
+127.0.0.1:6379> cluster nodes
+0302a02d70f17f14ff376677eca4871ee505bcfb 172.38.0.12:6379@16379 master - 0 1597739563012 2 connected 5461-10922
+88bd91cdb7fcd905fb0546399762afd1219cbdd3 172.38.0.15:6379@16379 slave 7692c06fb762868520fc0dd54766d1bff52cf954 0 1597739563000 5 connected
+a0013cba4060781319db50f4dbd175990e07fdc3 172.38.0.14:6379@16379 slave 9c08682de28222c200efbc0cdb55d5b48fb6e907 0 1597739564521 4 connected
+c4bb54439afc4e971e255d51248468e8a5bc7bbc 172.38.0.16:6379@16379 slave 0302a02d70f17f14ff376677eca4871ee505bcfb 0 1597739563513 6 connected
+9c08682de28222c200efbc0cdb55d5b48fb6e907 172.38.0.13:6379@16379 master - 0 1597739563000 3 connected 10923-16383
+7692c06fb762868520fc0dd54766d1bff52cf954 172.38.0.11:6379@16379 myself,master - 0 1597739562000 1 connected 0-5460
+```
+
+![image-20200818164319256](image/docker/redis集群测试.png)
+
+
+
+## SpringBoot 打包镜像
+
+1. 构建springboot项目
+
+```java
+/**
+ * @program: demo
+ * @description: hello 测试
+ * @author: Lijiat
+ * @create: 2020-08-18 16:59
+ */
+@RestController
+public class HelloController {
+
+    @RequestMapping("/hello")
+    public String hello(){
+        return "hello ,Lijiat";
+    }
+
+```
+
+2. 打包应用
+
+3. 编写Dockerfile
+
+```dockerfile
+FROM java:8
+
+COPY *.jar /app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["java","-jar","/app.jar"]
+```
+
+4. 构建镜像
+
+```shell
+# 上传jar包和Dockerfile文件到服务器
+# 构建镜像
+[root@iZm5e74mdg5903trjt1e17Z idea]# ll
+total 16140
+-rw-r--r-- 1 root root 16519869 Aug 18 17:22 demo-0.0.1-SNAPSHOT.jar
+-rw-r--r-- 1 root root       90 Aug 18 17:22 Dockerfile
+[root@iZm5e74mdg5903trjt1e17Z idea]# docker build -t springboot-demo .
+```
+
+5. 发布运行
+
+```shell
+[root@iZm5e74mdg5903trjt1e17Z idea]# docker run -d -p 8060:8080 --name springboot-web springboot-demo
+```
+
+
+
+# Docker Compose
+
+## 简介
+
+Docker Compose 来轻松高效的管理容器。定义运行多个容器
+
+> 官方介绍
+
+定义，运行多个容器
+
+YAML file 配置文件
+
+single command。命令有哪些
+
+Compose is a tool for defining and running multi-container Docker applications. With Compose, you use a YAML file to configure your application’s services. Then, with a single command, you create and start all the services from your configuration. To learn more about all the features of Compose, see [the list of features](https://docs.docker.com/compose/#features).
+
+Compose works in all environments: production, staging, development, testing, as well as CI workflows. You can learn more about each case in [Common Use Cases](https://docs.docker.com/compose/#common-use-cases).
+
+Using Compose is basically a three-step process:
+
+**三步骤：**
+
+1. Define your app’s environment with a **`Dockerfile`** so it can be reproduced anywhere.
+   1. Dockerfile保证我们的项目在任何地方可以运行
+2. Define the services that make up your app in `docker-compose.yml` so they can be run together in an isolated environment.
+   1. services 什么是服务
+   2. docker-compose.yml 这个文件怎么写
+3. Run `docker-compose up` and Compose starts and runs your entire app.
+   1. 启动项目
+
+> Compose的理解
+
+Compose是Docker官方的开源文档，需要安装
+
+Dockerfile 让程序在任何地方运行
+
+docker-compose.yml文件示例
+
+```yml
+version: '2.0'
+services:
+  web:
+    build: .
+    ports:
+    - "5000:5000"
+    volumes:
+    - .:/code
+    - logvolume01:/var/log
+    links:
+    - redis
+  redis:
+    image: redis
+volumes:
+  logvolume01: {}
+```
+
+Compose两个重要的概念
+
+- 服务services：容器，应用（web，mysql，redis）
+- 项目project：一组关联的容器。
+
+## 安装
+
+1、下载
+
+```shell
+# 官方的地址，特别慢
+sudo curl -L "https://github.com/docker/compose/releases/download/1.26.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+# 国内的镜像，会快点
+sudo curl -L https://get.daocloud.io/docker/compose/releases/download/1.25.5/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+
+# 权限赋值
+[root@iZm5e74mdg5903trjt1e17Z bin]# chmod +x /usr/local/bin/docker-compose
+```
+
+## 体验
+
+根据官方文档
+
+https://docs.docker.com/compose/gettingstarted/
+
+流程：
+
+1、创建网络
+
+2、执行Docker-compose.yml
+
+3、启动服务
+
+Creating composetest_redis_1 ... done
+Creating composetest_web_1   ... done
+
+
+
+# Docker Swarm
+
+
+
+
+
+# CI/CD 之 Jenkins
