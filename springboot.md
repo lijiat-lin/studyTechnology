@@ -359,3 +359,61 @@ public static final String DEFAULT_PREFIX = "classpath:/templates/";
 
 public static final String DEFAULT_SUFFIX = ".html";
 ```
+
+thymeleaf语法
+
+```java
+@RequestMapping("/test")
+    public String index(Model model) {
+        model.addAttribute("msg","<h1>hello,springboot</h1>");
+        return "test";
+    }
+```
+
+
+
+```html
+<!--所有的html元素都可以被 thymeleaf替换接管  th:元素名-->
+<!--th:text 获取字符串信息-->
+<div th:text="${msg}"></div>
+<!--th:utext 获取可转义的字符串信息-->
+<div th:utext="${msg}"></div>
+```
+
+## 自动配置SpringMvc
+
+https://blog.csdn.net/lizhiqiang1217/article/details/91355658
+
+```java
+/**
+ * 如果，你想diy一些定制化的功能，只要写这个组件，然后将它交给springboot  springboot就会帮我们自动装配
+ *
+ * @program: demo
+ * @description: mvcConfig
+ * @author: zhangjialin
+ * @create: 2020-08-26 11:35
+ */
+@Configuration
+public class MyMvcConfig implements WebMvcConfigurer {
+
+    /**
+     * ViewResolver 实现了视图解析器接口的类，我们就可以
+     * @return
+     */
+    @Bean
+    public ViewResolver myViewResolver(){
+        return new MyViewResolver();
+    }
+
+    /**
+     * 自定义一个视图解析器 MyViewResolver
+     */
+    public static class MyViewResolver implements ViewResolver{
+        @Override
+        public View resolveViewName(String viewName, Locale locale) throws Exception {
+            return null;
+        }
+    }
+}
+```
+
